@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gacha Cup</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+    <div class="parallax-bg"></div>
+    <div id="toast-wrap" class="toast-wrap"></div>
+
+    <header class="header">
+        <button class="menu-btn" onclick="openDrawer()">☰</button>
+        <div class="brand">🏆 Gacha Cup</div>
+        <div class="header-actions"><div id="ton-connect"></div></div>
+    </header>
+
+    <div class="stats-bar">
+        <div class="stat-card"><div class="stat-label">Balance</div><div class="stat-value" id="ui-balance">0.000 TON</div></div>
+        <div class="stat-card"><div class="stat-label">Cup Coins</div><div class="stat-value" id="ui-coins">0 CC</div></div>
+        <div class="stat-card"><div class="stat-label">Games Left</div><div class="stat-value" id="ui-games">2</div></div>
+    </div>
+
+    <section id="sec-play" class="section active">
+        <h2 class="section-title">⚡ Score Rush</h2>
+        <p class="muted">30-second runner. Tap to sprint, tap right side to jump. Reach the goal line to score!</p>
+        <div class="game-hud">
+            <span id="game-score">Score: 0</span>
+            <span id="game-time">Time: 30s</span>
+            <span id="ui-points">0 / 100</span>
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <button id="start-game-btn" class="action-btn" onclick="startGameUI()">Start Match (<span id="ui-games-btn">2</span> left)</button>
+    </section>
+
+    <section id="sec-market" class="section">
+        <h2 class="section-title">🛒 Pack Store</h2>
+        <p class="muted">Purchases use your in-app balance. Deposit TON from the Wallet tab first.</p>
+        <div class="market-container">
+            <div class="pack-card bronze">
+                <div class="pack-title" style="color:var(--bronze)">Bronze</div>
+                <div class="pack-price">0.2 TON</div>
+                <div class="pack-chances">Common 99% · Rare 1%</div>
+                <button class="action-btn" onclick="buyPack('BRONZE')">Open Bronze Pack</button>
+            </div>
+            <div class="pack-card silver">
+                <div class="pack-title" style="color:var(--silver)">Silver</div>
+                <div class="pack-price">1.0 TON</div>
+                <div class="pack-chances">Common 90% · Rare 9.9% · Epic 0.1%</div>
+                <button class="action-btn" onclick="buyPack('SILVER')">Open Silver Pack</button>
+            </div>
+            <div class="pack-card gold">
+                <div class="pack-title" style="color:var(--gold)">Gold</div>
+                <div class="pack-price">3.0 TON</div>
+                <div class="pack-chances">Epic 9% · Legendary 1%</div>
+                <button class="action-btn" onclick="buyPack('GOLD')">Open Gold Pack</button>
+            </div>
+            <div class="pack-card diamond">
+                <div class="pack-title" style="color:var(--diamond)">Diamond</div>
+                <div class="pack-price">7.0 TON</div>
+                <div class="pack-chances">Legendary 5%</div>
+                <button class="action-btn" onclick="buyPack('DIAMOND')">Open Diamond Pack</button>
+            </div>
+        </div>
+        <button class="action-btn secondary" onclick="claimFreePack()">Claim Daily Free Pack (100 CC)</button>
+    </section>
+
+    <section id="sec-burn" class="section">
+        <h2 class="section-title">🔥 Burn Cards</h2>
+        <p class="muted">Burn 10 Common cards to receive 1 Silver pack.</p>
+        <div id="burn-grid" class="inventory-grid"></div>
+        <button id="burn-btn" class="action-btn" onclick="executeBurn()">Burn 0 / 10 Cards</button>
+    </section>
+
+    <section id="sec-sell" class="section">
+        <h2 class="section-title">💰 Sell to House</h2>
+        <p class="muted">Only Epic and Legendary cards can be sold. 8% house commission applies.</p>
+        <div id="sell-grid" class="inventory-grid"></div>
+    </section>
+
+    <section id="sec-wallet" class="section">
+        <h2 class="section-title">💎 Wallet</h2>
+        <div class="panel deposit-box">
+            <p class="muted">Send real TON to load your <strong>in-app balance</strong>. This balance is used for packs. Withdrawals are processed manually by admin.</p>
+            <div class="muted">Deposit address</div>
+            <code id="deposit-wallet">...</code>
+            <button class="action-btn secondary" onclick="copyText('deposit-wallet')">Copy Address</button>
+            <div class="muted" style="margin-top:12px;">Required memo (comment)</div>
+            <code id="deposit-memo">...</code>
+            <button class="action-btn secondary" onclick="copyText('deposit-memo')">Copy Memo</button>
+        </div>
+        <div class="panel">
+            <div class="muted">Withdraw to linked wallet</div>
+            <input id="withdraw-wallet" type="text" placeholder="TON wallet address">
+            <input id="withdraw-amount" type="number" step="0.1" min="0.5" placeholder="Amount (min 0.5 TON)">
+            <button class="action-btn" onclick="submitWithdraw()">Request Withdrawal</button>
+            <p class="muted" style="margin-top:8px;">Fee: 0.05 TON · Manual approval required</p>
+        </div>
+    </section>
+
+    <section id="sec-collection" class="section">
+        <h2 class="section-title">📚 Collection</h2>
+        <div id="collection-grid" class="inventory-grid"></div>
+    </section>
+
+    <section id="sec-tasks" class="section">
+        <h2 class="section-title">📋 Tasks</h2>
+        <div id="tasks-list"></div>
+        <div class="panel" style="margin-top:12px;">
+            <div class="muted">Referral link (3% commission on pack purchases)</div>
+            <code id="referral-link">...</code>
+        </div>
+    </section>
+
+    <div id="opening-overlay"><div style="font-size:3rem;">⚡</div><div style="color:#111;font-weight:800;">Opening Pack...</div></div>
+    <div id="results-container">
+        <h2>Pack Opened!</h2>
+        <div class="result-cards" id="result-cards-wrapper"></div>
+        <button class="action-btn secondary" style="width:auto;padding:10px 24px;margin-top:20px;" onclick="closeResults()">Collect</button>
+    </div>
+
+    <nav class="nav-bar">
+        <div class="nav-item active" onclick="switchTab('play', this)"><div class="nav-icon">⚡</div><div>Play</div></div>
+        <div class="nav-item" onclick="switchTab('market', this)"><div class="nav-icon">🛒</div><div>Market</div></div>
+        <div class="nav-item" onclick="switchTab('burn', this)"><div class="nav-icon">🔥</div><div>Burn</div></div>
+        <div class="nav-item" onclick="switchTab('sell', this)"><div class="nav-icon">💰</div><div>Sell</div></div>
+        <div class="nav-item" onclick="switchTab('wallet', this)"><div class="nav-icon">💎</div><div>Wallet</div></div>
+    </nav>
+
+    <div id="drawer" class="drawer" onclick="closeDrawer()">
+        <div class="drawer-panel" onclick="event.stopPropagation()">
+            <h3 style="margin-bottom:12px;">Menu</h3>
+            <div class="drawer-link" onclick="switchTab('collection', null); closeDrawer();">📚 Collection</div>
+            <div class="drawer-link" onclick="switchTab('tasks', null); closeDrawer();">📋 Tasks</div>
+            <div class="drawer-link" onclick="switchTab('wallet', null); closeDrawer();">💎 Wallet & Deposit</div>
+            <div class="drawer-link"><a href="/admin.html" style="color:white;text-decoration:none;">🛡 Admin Panel</a></div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

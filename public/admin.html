@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gacha Cup Admin</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+    <header class="header"><div class="brand">🛡 Admin Panel</div></header>
+    <div class="section active" style="display:block;padding:16px;">
+        <div class="panel">
+            <label class="muted">Admin Telegram ID</label>
+            <input id="admin-id" type="text" placeholder="5976137706">
+            <button class="action-btn" onclick="loadAdmin()">Load Dashboard</button>
+        </div>
+
+        <div id="stats" class="stats-bar" style="padding:0;margin-top:12px;"></div>
+
+        <h3 class="section-title" style="margin-top:20px;">Pending Withdrawals</h3>
+        <div id="withdrawals"></div>
+
+        <h3 class="section-title" style="margin-top:20px;">Create Today's Match</h3>
+        <div class="panel">
+            <input id="match-title" type="text" placeholder="World Cup Qualifier">
+            <input id="team-a" type="text" placeholder="Team A">
+            <input id="team-b" type="text" placeholder="Team B">
+            <input id="match-date" type="text" placeholder="YYYY-MM-DD">
+            <button class="action-btn" onclick="createMatch()">Publish Match</button>
+        </div>
+    </div>
+
+    <script>
+        function adminHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'x-admin-id': document.getElementById('admin-id').value
+            };
+        }
+
+        async function loadAdmin() {
+            const res = await fetch('/api/admin/summary', { headers: adminHeaders() });
+            const data = await res.json();
+            if (!data.success) return alert(data.message);
+
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value">${data.stats.userCount}</div></div>
+                <div class="stat-card"><div class="stat-label">Deposits</div><div class="stat-value">${data.stats.totalDeposits.toFixed(2)}</div></div>
+                <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value">${data.stats.pendingWithdrawals}</div></div>`;
+
+            document.getElementById('withdrawals').innerHTML = data.pendingWithdrawals.map(w => `
+                <div class="panel">
+                    <div><strong>User:</strong> ${w.chatId}</div>
+                    <div><strong>Net:</strong> ${w.netAmount} TON → ${w.walletAddress}</div>
+                    <div class="muted">Requested: ${new Date(w.createdAt).toLocaleString()}</div>
+                    <button class="action-btn secondary" onclick="updateWithdraw('${w._id}', 'approved')">Mark Approved (sent manually)</button>
+                    <button class="action-btn" style="background:#ef4444;margin-top:8px;" onclick="updateWithdraw('${w._id}', 'rejected')">Reject & Refund</button>
+                </div>`).join('') || '<p class="muted">No pending withdrawals.</p>';
+        }
+
+        async function updateWithdraw(id, status) {
+            const adminNote = prompt('Optional note:') || '';
+            const res = await fetch(`/api/admin/withdrawals/${id}`, {
+                method: 'POST',
+                headers: adminHeaders(),
+                body: JSON.stringify({ status, adminNote })
+            });
+            const data = await res.json();
+            alert(data.message || 'Updated');
+            loadAdmin();
+        }
+
+        async function createMatch() {
+            const body = {
+                title: document.getElementById('match-title').value,
+                teamA: document.getElementById('team-a').value,
+                teamB: document.getElementById('team-b').value,
+                matchDate: document.getElementById('match-date').value || new Date().toISOString().split('T')[0]
+            };
+            const res = await fetch('/api/admin/match', {
+                method: 'POST',
+                headers: adminHeaders(),
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            alert(data.success ? 'Match published!' : data.message);
+        }
+
+        document.getElementById('match-date').value = new Date().toISOString().split('T')[0];
+    </script>
+</body>
+</html>
