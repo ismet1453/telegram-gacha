@@ -5,6 +5,7 @@ const path = require('path');
 const { connectDB } = require('./database');
 const apiRoutes = require('./routes/api');
 const campaignRoutes = require('./routes/campaign');
+const airdropRoutes = require('./routes/airdrop');
 const { startDepositWatcher } = require('./services/tonDepositWatcher');
 const { processDeposit } = require('./services/gameService');
 
@@ -27,6 +28,7 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
+app.use('/api/airdrop', airdropRoutes);
 app.use('/airdrop', express.static(path.join(__dirname, 'website')));
 app.use('/site', express.static(path.join(__dirname, 'public/site')));
 app.use(express.static(path.join(__dirname, 'public')));

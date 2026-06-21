@@ -81,6 +81,95 @@ function loadProgress() {
 
 function saveProgress() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+    scheduleServerSync();
+}
+
+function getApiBase() {
+    const meta = document.querySelector('meta[name="api-origin"]')?.content?.trim();
+    return (meta || window.location.origin).replace(/\/$/, '');
+}
+
+function mergeProgress(local, remote) {
+    if (!remote) return { ...local };
+    const tasks = [...new Set([...(local.completedTasks || []), ...(remote.completedTasks || [])])];
+    const earnedTon = Math.min(MAX_TON, Math.max(local.earnedTon || 0, remote.earnedTon || 0, tasks.length));
+    return {
+        completedTasks: tasks,
+        earnedTon,
+        claimed: !!(local.claimed || remote.claimed),
+        walletAddress: local.walletAddress || remote.walletAddress || ''
+    };
+}
+
+let syncTimer = null;
+
+function scheduleServerSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => { syncToServer().catch(() => {}); }, 350);
+}
+
+async function syncToServer() {
+    const wallet = state.progress.walletAddress;
+    if (!wallet || wallet.length < 10) return false;
+
+    try {
+        const res = await fetch(`${getApiBase()}/api/airdrop/progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                walletAddress: wallet,
+                completedTasks: state.progress.completedTasks,
+                earnedTon: state.progress.earnedTon,
+                claimed: state.progress.claimed
+            })
+        });
+        const data = await res.json();
+        if (data.success && data.stats) {
+            state.globalStats = data.stats;
+            saveGlobalStats();
+            updateGlobalStatsUI();
+        }
+        return data.success;
+    } catch {
+        return false;
+    }
+}
+
+async function pullFromServer(wallet) {
+    const w = wallet || state.progress.walletAddress;
+    try {
+        const url = w && w.length >= 10
+            ? `${getApiBase()}/api/airdrop/progress?wallet=${encodeURIComponent(w)}`
+            : `${getApiBase()}/api/airdrop/progress`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.stats) {
+            state.globalStats = data.stats;
+            saveGlobalStats();
+            updateGlobalStatsUI();
+        }
+        if (data.progress && w) {
+            const localSnapshot = { ...state.progress };
+            state.progress = mergeProgress(localSnapshot, data.progress);
+            state.progress.walletAddress = w;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+        }
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+async function onWalletLinked(address) {
+    const localSnapshot = { ...state.progress, walletAddress: address };
+    state.progress.walletAddress = address;
+    await pullFromServer(address);
+    state.progress = mergeProgress(localSnapshot, state.progress);
+    state.progress.walletAddress = address;
+    saveProgress();
+    await syncToServer();
+    renderTasks();
+    updateStash();
 }
 
 function loadGlobalStats() {
@@ -381,14 +470,10 @@ function markClaimed() {
 
     state.progress.claimed = true;
     saveProgress();
-
-    state.globalStats.playersRemaining = Math.max(0, state.globalStats.playersRemaining - 1);
-    state.globalStats.tonPoolRemaining = Math.max(0, state.globalStats.tonPoolRemaining - CONFIG.poolDecrementPerClaim);
-    saveGlobalStats();
-
-    updateGlobalStatsUI();
-    updateStash();
-    renderTasks();
+    syncToServer().then(() => {
+        updateStash();
+        renderTasks();
+    });
 }
 
 function handleClaim() {
@@ -442,11 +527,10 @@ async function setupTonConnect() {
         tonConnectUI.openModal();
     });
 
-    tonConnectUI.onStatusChange((wallet) => {
+    tonConnectUI.onStatusChange(async (wallet) => {
         if (wallet?.account?.address) {
-            state.progress.walletAddress = wallet.account.address;
-            saveProgress();
-            showToast('Wallet connected!');
+            await onWalletLinked(wallet.account.address);
+            showToast('Wallet connected — progress synced!');
         } else if (!state.progress.claimed) {
             state.progress.walletAddress = '';
             saveProgress();
@@ -457,18 +541,17 @@ async function setupTonConnect() {
     try {
         const restored = await tonConnectUI.connectionRestored;
         if (restored && tonConnectUI.wallet?.account?.address) {
-            state.progress.walletAddress = tonConnectUI.wallet.account.address;
-            saveProgress();
+            await onWalletLinked(tonConnectUI.wallet.account.address);
         }
     } catch { /* ignore */ }
 
     updateWalletUI();
 }
 
-function init() {
+async function init() {
     initParticles();
     bindFaq();
-    updateGlobalStatsUI();
+    await pullFromServer();
     renderTasks();
     updateStash();
     $('#claim-btn').addEventListener('click', handleClaim);
@@ -478,7 +561,7 @@ function init() {
     });
     updateCountdown();
     setInterval(updateCountdown, 1000);
-    setupTonConnect();
+    await setupTonConnect();
 }
 
 init();

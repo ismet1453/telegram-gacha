@@ -1,0 +1,7 @@
+{
+  "name": "gacha-cup-website",
+  "private": true,
+  "dependencies": {
+    "mongoose": "^9.7.1"
+  }
+}
