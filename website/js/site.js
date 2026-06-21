@@ -123,7 +123,11 @@ async function syncToServer() {
             })
         });
         const data = await res.json();
-        if (data.success && data.stats) {
+        if (!data.success) {
+            console.warn('Server sync failed:', data.message);
+            return false;
+        }
+        if (data.stats) {
             state.globalStats = data.stats;
             saveGlobalStats();
             updateGlobalStatsUI();
@@ -247,7 +251,18 @@ function maskAddress(addr) {
 }
 
 function isWalletConnected() {
-    return !!(state.progress.walletAddress && state.progress.walletAddress.length >= 10);
+    const input = $('#wallet-address');
+    const fromInput = input?.value?.trim() || '';
+    const addr = fromInput || state.progress.walletAddress || '';
+    return addr.length >= 10;
+}
+
+function syncWalletFromInput() {
+    const input = $('#wallet-address');
+    if (!input) return state.progress.walletAddress || '';
+    const trimmed = input.value.trim();
+    if (trimmed) state.progress.walletAddress = trimmed;
+    return state.progress.walletAddress || '';
 }
 
 function initParticles() {
@@ -463,18 +478,30 @@ function closeSuccessModal() {
     if (overlay) overlay.hidden = true;
 }
 
-function markClaimed() {
-    if (state.progress.claimed) return;
+async function markClaimed() {
+    if (state.progress.claimed) return true;
 
+    syncWalletFromInput();
     state.progress.claimed = true;
-    saveProgress();
-    syncToServer().then(() => {
-        updateStash();
-        renderTasks();
-    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+    clearTimeout(syncTimer);
+
+    const ok = await syncToServer();
+    if (!ok) {
+        state.progress.claimed = false;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+        showToast('Could not save your claim. Check your wallet address and try again.', true);
+        return false;
+    }
+
+    updateStash();
+    renderTasks();
+    return true;
 }
 
-function handleClaim() {
+async function handleClaim() {
+    syncWalletFromInput();
+
     if (!allTasksDone() || !isWalletConnected()) {
         showToast(`❌ Please complete all ${CONFIG.tasks.length} tasks and enter your wallet address!`, true);
         return;
@@ -486,7 +513,10 @@ function handleClaim() {
     }
 
     if (!state.progress.claimed) {
-        markClaimed();
+        const ok = await markClaimed();
+        if (!ok) return;
+    } else {
+        await syncToServer();
     }
 
     openSuccessModal();
@@ -520,16 +550,12 @@ function bindWalletInput() {
 
     const applyWallet = async (address) => {
         const trimmed = address.trim();
-        if (trimmed === state.progress.walletAddress) {
-            updateWalletUI();
-            updateStash();
-            return;
-        }
         state.progress.walletAddress = trimmed;
         if (trimmed.length >= 10) {
             await onWalletLinked(trimmed);
         } else {
-            saveProgress();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+            clearTimeout(syncTimer);
             updateWalletUI();
             updateStash();
         }
@@ -537,13 +563,22 @@ function bindWalletInput() {
 
     input.addEventListener('input', () => {
         clearTimeout(syncDebounce);
-        syncDebounce = setTimeout(() => { applyWallet(input.value); }, 500);
+        syncDebounce = setTimeout(() => { applyWallet(input.value); }, 300);
     });
 
     input.addEventListener('blur', () => {
         clearTimeout(syncDebounce);
         applyWallet(input.value);
     });
+
+    input.addEventListener('change', () => {
+        clearTimeout(syncDebounce);
+        applyWallet(input.value);
+    });
+}
+
+async function refreshLiveStats() {
+    await pullFromServer();
 }
 
 async function init() {
@@ -557,13 +592,14 @@ async function init() {
     }
     renderTasks();
     updateStash();
-    $('#claim-btn').addEventListener('click', handleClaim);
+    $('#claim-btn').addEventListener('click', () => { handleClaim(); });
     $('#success-close')?.addEventListener('click', closeSuccessModal);
     $('#success-overlay')?.addEventListener('click', (e) => {
         if (e.target.id === 'success-overlay') closeSuccessModal();
     });
     updateCountdown();
     setInterval(updateCountdown, 1000);
+    setInterval(() => { refreshLiveStats().catch(() => {}); }, 20000);
 }
 
 init();
