@@ -114,35 +114,50 @@ async function syncToServer() {
         return { ok: false, message: 'Enter a valid TON address (UQ... or EQ..., 48+ characters).' };
     }
 
-    try {
-        const res = await fetch(`${getApiBase()}/api/airdrop/progress`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                walletAddress: wallet,
-                completedTasks: state.progress.completedTasks,
-                earnedTon: state.progress.earnedTon,
-                claimed: state.progress.claimed
-            })
-        });
-        let data = {};
+    const payload = {
+        walletAddress: wallet,
+        completedTasks: state.progress.completedTasks,
+        earnedTon: state.progress.earnedTon,
+        claimed: state.progress.claimed
+    };
+
+    for (let attempt = 0; attempt < 3; attempt++) {
         try {
-            data = await res.json();
+            const res = await fetch(`${getApiBase()}/api/airdrop/progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            let data = {};
+            try {
+                data = await res.json();
+            } catch {
+                return { ok: false, message: `Server error (${res.status}). Try again shortly.` };
+            }
+            if (!res.ok || !data.success) {
+                const msg = data.message || `Server error (${res.status})`;
+                const retryable = /reconnecting|not primary|server selection/i.test(msg);
+                if (retryable && attempt < 2) {
+                    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+                    continue;
+                }
+                return { ok: false, message: msg };
+            }
+            if (data.stats) {
+                state.globalStats = data.stats;
+                saveGlobalStats();
+                updateGlobalStatsUI();
+            }
+            return { ok: true };
         } catch {
-            return { ok: false, message: `Server error (${res.status}). Try again shortly.` };
+            if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+                continue;
+            }
+            return { ok: false, message: 'Network error — check your connection and try again.' };
         }
-        if (!res.ok || !data.success) {
-            return { ok: false, message: data.message || `Server error (${res.status})` };
-        }
-        if (data.stats) {
-            state.globalStats = data.stats;
-            saveGlobalStats();
-            updateGlobalStatsUI();
-        }
-        return { ok: true };
-    } catch {
-        return { ok: false, message: 'Network error — check your connection and try again.' };
     }
+    return { ok: false, message: 'Could not save. Try again in a few seconds.' };
 }
 
 async function pullFromServer(wallet) {
