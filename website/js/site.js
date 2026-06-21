@@ -10,7 +10,7 @@ const CONFIG = {
     initialPool: 3000,
     poolDecrementPerClaim: 3,
     // Set this when your RT post is live (Step 2 link)
-    rtPostUrl: '',
+    rtPostUrl: 'https://x.com/FootballGacha/status/2068753921137373385',
     tasks: [
         {
             id: 'follow_x',
@@ -25,10 +25,10 @@ const CONFIG = {
             id: 'retweet',
             step: '2',
             title: 'Pass the Ball',
-            description: 'Repost the pinned World Cup trailer on 𝕏.',
+            description: 'Like and repost our Kick-Off Airdrop post on 𝕏.',
             reward: '+1.00 TON',
             urlKey: 'rtPostUrl',
-            confirmLabel: 'I Reposted'
+            confirmLabel: 'I Liked & Reposted'
         },
         {
             id: 'join_telegram',
@@ -301,7 +301,7 @@ function renderTasks() {
             : !done && linkReady
                 ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Open the link, complete the action, then confirm.</div>'
                 : !done && !linkReady && task.urlKey
-                    ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Repost link will be added after launch.</div>'
+                    ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Like & repost the post, then confirm.</div>'
                     : '';
 
         return `
