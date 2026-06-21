@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#070a16">
+    <title>Gacha Cup — World Cup Kick-Off Airdrop</title>
+    <meta name="description" content="Complete the 3-step hattrick and secure 3.00 TON before kickoff.">
+    <!-- TonConnect manifest API (Railway/Vercel). Empty = same origin as this page. -->
+    <meta name="ton-api-origin" content="">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/site.css">
+    <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
+</head>
+<body>
+    <div class="app-bg">
+        <div class="rose-pattern"></div>
+        <div class="stadium-glow"></div>
+        <div class="particles" id="particles"></div>
+    </div>
+
+    <header class="header">
+        <div class="brand-block">
+            <div class="brand-mark">GC</div>
+            <div>
+                <div class="brand-title">GACHA&nbsp;CUP</div>
+                <div class="brand-sub">Kick-Off Airdrop</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="page section active">
+        <div class="hero-banner hero-banner--compact">
+            <div class="hero-badge">● WORLD CUP KICK-OFF AIRDROP 🏆</div>
+            <h1 class="hero-title">COLLECT.<br><span>COMPETE.</span> <span class="gold-dot">WIN.</span></h1>
+        </div>
+
+        <div class="featured-strip glass campaign-stats">
+            <div class="player-stats-row">
+                <div class="pstat">
+                    <div class="pstat-label">Players In</div>
+                    <div class="pstat-val cyan" id="stat-participants">1,000</div>
+                </div>
+                <div class="pstat-divider"></div>
+                <div class="pstat">
+                    <div class="pstat-label">TON Locked Pool</div>
+                    <div class="pstat-val" id="stat-pool">3,000</div>
+                </div>
+                <div class="pstat-divider"></div>
+                <div class="pstat">
+                    <div class="pstat-label">Max Bag / User</div>
+                    <div class="pstat-val gold">3.00</div>
+                    <div class="pstat-unit">TON</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Status dashboard -->
+        <div class="player-card glass premium-border stash-card">
+            <div class="player-card-top">
+                <div class="avatar-ring">
+                    <div class="avatar stash-avatar">🏆</div>
+                    <div class="rank-pill">PHASE 1</div>
+                </div>
+                <div class="player-info">
+                    <div class="player-name">Your Airdrop Stash</div>
+                    <div class="player-meta" id="reward-hint">Your bag is empty, Coach. Warm up and score your first TON below! 👇</div>
+                </div>
+            </div>
+            <div class="stash-amount-row">
+                <span class="stash-amount" id="earned-ton">0.00</span>
+                <span class="stash-amount-sep">/</span>
+                <span class="stash-amount-max">3.00 TON</span>
+            </div>
+            <div class="stash-progress-wrap">
+                <div class="stash-progress-meta">
+                    <span id="progress-pct">0%</span>
+                    <span id="progress-tasks">0 / 3 tasks</span>
+                </div>
+                <div class="stash-progress-track">
+                    <div class="stash-progress-fill" id="reward-progress"></div>
+                    <div class="stash-progress-glow" id="reward-progress-glow"></div>
+                </div>
+            </div>
+            <div class="player-stats-row stash-countdown-row">
+                <div class="pstat">
+                    <div class="pstat-label">Kickoff In</div>
+                    <div class="pstat-val cyan countdown-val" id="countdown">3d 18h 0m 0s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Tasks -->
+        <h2 class="section-title">⚽ The 3-Step Hattrick</h2>
+        <p class="muted section-lead">Score 3 out of 3 to guarantee your maximum airdrop allocation.</p>
+        <div id="tasks-grid"></div>
+
+        <div class="quick-row locked-phases">
+            <span class="quick-chip quick-chip--locked">🔒 Phase 2 · VIP</span>
+            <span class="quick-chip quick-chip--locked">🔒 Phase 3 · Launch</span>
+        </div>
+
+        <!-- 3. Secure allocation + claim -->
+        <section class="secure-zone glass premium-border">
+            <div class="secure-gem" aria-hidden="true">
+                <span class="secure-gem__shine"></span>
+                <span class="secure-gem__icon">💎</span>
+            </div>
+
+            <h2 class="secure-zone__title">SECURE YOUR ALLOCATION</h2>
+            <p class="secure-zone__desc muted">Connect your wallet to bind your 3.00 TON airdrop bag to your address.</p>
+
+            <div id="wallet-connect-panel">
+                <button class="connect-ton-btn" id="connect-ton-btn" type="button">
+                    <span class="connect-ton-btn__gem">💎</span>
+                    CONNECT TON WALLET
+                </button>
+                <p class="trust-badges muted">
+                    🛡️ Official TonConnect SDK &nbsp;·&nbsp; 🔒 Read-Only Access &nbsp;·&nbsp; ⚡ Zero Gas Fees
+                </p>
+            </div>
+
+            <div id="wallet-bound-panel" hidden>
+                <div class="wallet-bound-badge">🟢 Wallet Successfully Bound</div>
+                <p class="wallet-bound-addr">Address: <span id="masked-address">—</span></p>
+                <p class="wallet-bound-msg muted">Your 3.00 TON allocation is securely locked to this address. See you at kickoff!</p>
+            </div>
+
+            <button class="action-btn secure-zone__claim claim-locked" id="claim-btn" type="button" disabled>AİRDROP'U TALEP ET</button>
+            <p class="claim-note muted" id="claim-note">Complete all 3 tasks and connect your TON wallet to claim.</p>
+        </section>
+
+        <section class="faq glass" id="faq">
+            <button class="faq__item" type="button" aria-expanded="false">
+                <span class="faq__q">Is connecting my wallet safe?</span>
+                <span class="faq__chev">▼</span>
+            </button>
+            <div class="faq__a" hidden>
+                <p>Yes. We use official TonConnect protocol. The app only requests 'View' access to verify your address. It cannot touch or move your funds.</p>
+            </div>
+
+            <button class="faq__item" type="button" aria-expanded="false">
+                <span class="faq__q">Why do I need to connect now?</span>
+                <span class="faq__chev">▼</span>
+            </button>
+            <div class="faq__a" hidden>
+                <p>To prevent bot abuse. Every airdrop bag must be tied to a verified TON address before the snapshot.</p>
+            </div>
+        </section>
+
+        <div id="ton-connect" class="ton-connect-hidden" aria-hidden="true"></div>
+
+        <div class="ticker-bar">
+            <div class="ticker-track">
+                <span>🏆 3,000 TON POOL · 1,000 SPOTS</span>
+                <span>·</span>
+                <span>𝕏 FOLLOW · REPOST · TELEGRAM JOIN</span>
+                <span>·</span>
+                <span>💎 CLAIM YOUR 3.00 TON AIRDROP</span>
+                <span>·</span>
+                <span>🏆 3,000 TON POOL · 1,000 SPOTS</span>
+                <span>·</span>
+                <span>𝕏 FOLLOW · REPOST · TELEGRAM JOIN</span>
+                <span>·</span>
+                <span>💎 CLAIM YOUR 3.00 TON AIRDROP</span>
+            </div>
+        </div>
+
+        <!-- Partners -->
+        <footer class="partners">
+            <div class="partners__item">
+                <span class="partners__logo-box">
+                    <img class="partners__logo partners__logo--ton" src="images/partners/ton.png?v=2" alt="TON">
+                </span>
+                <span>Powered by <strong>TON</strong></span>
+            </div>
+            <div class="partners__dot"></div>
+            <div class="partners__item">
+                <span class="partners__logo-box">
+                    <img class="partners__logo partners__logo--telegram" src="images/partners/telegram.png" alt="Telegram">
+                </span>
+                <span>Built for <strong>Telegram</strong></span>
+            </div>
+        </footer>
+    </main>
+
+    <nav class="nav-bar">
+        <div class="nav-item active">
+            <div class="nav-icon-wrap">🏆</div><span>Airdrop</span>
+        </div>
+        <div class="nav-item nav-item--locked">
+            <div class="nav-icon-wrap">👑</div><span>VIP</span>
+        </div>
+        <div class="nav-item nav-item--locked">
+            <div class="nav-icon-wrap">🚀</div><span>Launch</span>
+        </div>
+        <a class="nav-item nav-item--link" href="https://t.me/FootballGacha" target="_blank" rel="noopener">
+            <div class="nav-icon-wrap">📢</div><span>Telegram</span>
+        </a>
+    </nav>
+
+    <div class="success-overlay" id="success-overlay" hidden>
+        <div class="success-panel glass premium-border">
+            <div class="success-glow" aria-hidden="true"></div>
+            <div class="success-trophy">🏆</div>
+            <h3 class="success-title">TEBRİK EDERİZ, KAPTAN!</h3>
+            <p class="success-desc">3.00 TON değerindeki airdrop çantanız başarıyla cüzdan adresinize kilitlendi. Ödüller lansman geri sayımı (3 gün sonra) tamamlandığında cüzdanınıza dağıtılacaktır. Yeriniz garanti, takipte kalın!</p>
+            <button class="action-btn success-close" id="success-close" type="button">Harika! (Kapat)</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="js/site.js"></script>
+</body>
+</html>

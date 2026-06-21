@@ -1,0 +1,19 @@
+{
+    "rewrites": [
+        { "source": "/tonconnect-manifest.json", "destination": "/api/manifest" }
+    ],
+    "headers": [
+        {
+            "source": "/tonconnect-manifest.json",
+            "headers": [
+                { "key": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+        },
+        {
+            "source": "/logo.png",
+            "headers": [
+                { "key": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+        }
+    ]
+}
