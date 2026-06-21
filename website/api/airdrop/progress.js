@@ -41,7 +41,21 @@ function cors(res) {
 }
 
 function normalizeWallet(w) {
-    return String(w || '').trim();
+    let s = String(w || '').trim().replace(/\s+/g, '');
+    const friendly = s.match(/(?:EQ|UQ|kQ|eq|uq|kq)[A-Za-z0-9_-]{43,48}/i);
+    if (friendly) {
+        const addr = friendly[0];
+        return addr.slice(0, 2).toUpperCase() + addr.slice(2);
+    }
+    const raw = s.match(/0:[a-fA-F0-9]{64}/);
+    if (raw) return raw[0];
+    return s;
+}
+
+function isValidWallet(wallet) {
+    const w = normalizeWallet(wallet);
+    if (w.startsWith('0:')) return /^0:[a-fA-F0-9]{64}$/.test(w);
+    return /^[EUk]Q[A-Za-z0-9_-]{43,48}$/.test(w);
 }
 
 function serialize(doc) {
@@ -59,6 +73,35 @@ async function getStats(col) {
         playersRemaining: Math.max(0, INITIAL_PLAYERS - claimedCount),
         tonPoolRemaining: Math.max(0, INITIAL_POOL - claimedCount * POOL_PER_CLAIM)
     };
+}
+
+async function readRequestBody(req) {
+    if (req.body !== undefined && req.body !== null) {
+        if (typeof req.body === 'string') {
+            const text = req.body.trim();
+            return text ? JSON.parse(text) : {};
+        }
+        if (Buffer.isBuffer(req.body)) {
+            const text = req.body.toString('utf8').trim();
+            return text ? JSON.parse(text) : {};
+        }
+        if (typeof req.body === 'object') {
+            return req.body;
+        }
+    }
+
+    return new Promise((resolve, reject) => {
+        let raw = '';
+        req.on('data', (chunk) => { raw += chunk; });
+        req.on('end', () => {
+            try {
+                resolve(raw.trim() ? JSON.parse(raw) : {});
+            } catch (error) {
+                reject(new Error('Invalid JSON body'));
+            }
+        });
+        req.on('error', reject);
+    });
 }
 
 module.exports = async (req, res) => {
@@ -79,7 +122,7 @@ module.exports = async (req, res) => {
             const wallet = normalizeWallet(req.query.wallet);
             const stats = await getStats(col);
 
-            if (wallet.length < 10) {
+            if (!isValidWallet(wallet)) {
                 return res.status(200).json({ success: true, progress: null, stats });
             }
 
@@ -92,10 +135,19 @@ module.exports = async (req, res) => {
         }
 
         if (req.method === 'POST') {
-            const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+            let body;
+            try {
+                body = await readRequestBody(req);
+            } catch {
+                return res.status(400).json({ success: false, message: 'Invalid request body' });
+            }
+
             const wallet = normalizeWallet(body.walletAddress);
-            if (wallet.length < 10) {
-                return res.status(400).json({ success: false, message: 'Invalid wallet address' });
+            if (!isValidWallet(wallet)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid TON wallet. Paste the full address from your wallet (UQ... or EQ...).'
+                });
             }
 
             const tasks = Array.isArray(body.completedTasks)
@@ -135,9 +187,14 @@ module.exports = async (req, res) => {
         return res.status(405).json({ success: false, message: 'Method not allowed' });
     } catch (error) {
         console.error('Airdrop API error:', error.message);
+        const msg = error.message === 'MONGO_URI not configured'
+            ? 'MONGO_URI not set on Vercel. Add it in Project Settings → Environment Variables, then redeploy.'
+            : (error.message || 'Server error');
         return res.status(503).json({
             success: false,
-            message: 'Database connection failed. Check MONGO_URI on Vercel and MongoDB Atlas Network Access (allow 0.0.0.0/0).'
+            message: msg.includes('MONGO') || msg.includes('connect')
+                ? 'Database connection failed. Check MONGO_URI on Vercel and MongoDB Atlas Network Access (allow 0.0.0.0/0).'
+                : msg
         });
     }
 };

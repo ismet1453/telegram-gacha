@@ -108,8 +108,11 @@ function scheduleServerSync() {
 }
 
 async function syncToServer() {
+    syncWalletFromInput();
     const wallet = state.progress.walletAddress;
-    if (!wallet || wallet.length < 10) return false;
+    if (!isValidWalletAddress(wallet)) {
+        return { ok: false, message: 'Enter a valid TON address (UQ... or EQ..., 48+ characters).' };
+    }
 
     try {
         const res = await fetch(`${getApiBase()}/api/airdrop/progress`, {
@@ -122,26 +125,30 @@ async function syncToServer() {
                 claimed: state.progress.claimed
             })
         });
-        const data = await res.json();
-        if (!data.success) {
-            console.warn('Server sync failed:', data.message);
-            return false;
+        let data = {};
+        try {
+            data = await res.json();
+        } catch {
+            return { ok: false, message: `Server error (${res.status}). Try again shortly.` };
+        }
+        if (!res.ok || !data.success) {
+            return { ok: false, message: data.message || `Server error (${res.status})` };
         }
         if (data.stats) {
             state.globalStats = data.stats;
             saveGlobalStats();
             updateGlobalStatsUI();
         }
-        return data.success;
+        return { ok: true };
     } catch {
-        return false;
+        return { ok: false, message: 'Network error — check your connection and try again.' };
     }
 }
 
 async function pullFromServer(wallet) {
-    const w = wallet || state.progress.walletAddress;
+    const w = normalizeWalletInput(wallet || state.progress.walletAddress);
     try {
-        const url = w && w.length >= 10
+        const url = isValidWalletAddress(w)
             ? `${getApiBase()}/api/airdrop/progress?wallet=${encodeURIComponent(w)}`
             : `${getApiBase()}/api/airdrop/progress`;
         const res = await fetch(url);
@@ -151,28 +158,16 @@ async function pullFromServer(wallet) {
             saveGlobalStats();
             updateGlobalStatsUI();
         }
-        if (data.progress && w) {
+        if (data.progress && isValidWalletAddress(w)) {
             const localSnapshot = { ...state.progress };
             state.progress = mergeProgress(localSnapshot, data.progress);
-            state.progress.walletAddress = w;
+            if (!state.progress.walletAddress) state.progress.walletAddress = w;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
         }
         return data;
     } catch {
         return null;
     }
-}
-
-async function onWalletLinked(address) {
-    const localSnapshot = { ...state.progress, walletAddress: address };
-    state.progress.walletAddress = address;
-    await pullFromServer(address);
-    state.progress = mergeProgress(localSnapshot, state.progress);
-    state.progress.walletAddress = address;
-    saveProgress();
-    await syncToServer();
-    renderTasks();
-    updateStash();
 }
 
 function loadGlobalStats() {
@@ -250,19 +245,35 @@ function maskAddress(addr) {
     return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 }
 
-function isWalletConnected() {
-    const input = $('#wallet-address');
-    const fromInput = input?.value?.trim() || '';
-    const addr = fromInput || state.progress.walletAddress || '';
-    return addr.length >= 10;
+function normalizeWalletInput(value) {
+    let s = String(value || '').trim().replace(/\s+/g, '');
+    const friendly = s.match(/(?:EQ|UQ|kQ|eq|uq|kq)[A-Za-z0-9_-]{43,48}/i);
+    if (friendly) {
+        const addr = friendly[0];
+        return addr.slice(0, 2).toUpperCase() + addr.slice(2);
+    }
+    const raw = s.match(/0:[a-fA-F0-9]{64}/);
+    if (raw) return raw[0];
+    return s;
+}
+
+function isValidWalletAddress(addr) {
+    const w = normalizeWalletInput(addr);
+    if (w.startsWith('0:')) return /^0:[a-fA-F0-9]{64}$/.test(w);
+    return /^[EUk]Q[A-Za-z0-9_-]{43,48}$/.test(w);
 }
 
 function syncWalletFromInput() {
     const input = $('#wallet-address');
     if (!input) return state.progress.walletAddress || '';
-    const trimmed = input.value.trim();
-    if (trimmed) state.progress.walletAddress = trimmed;
-    return state.progress.walletAddress || '';
+    const trimmed = normalizeWalletInput(input.value);
+    state.progress.walletAddress = trimmed;
+    if (input.value !== trimmed) input.value = trimmed;
+    return trimmed;
+}
+
+function isWalletConnected() {
+    return isValidWalletAddress(syncWalletFromInput() || state.progress.walletAddress);
 }
 
 function initParticles() {
@@ -323,29 +334,40 @@ function allTasksDone() {
 }
 
 function updateWalletUI() {
-    const connected = isWalletConnected();
     const inputPanel = $('#wallet-input-panel');
     const boundPanel = $('#wallet-bound-panel');
     const input = $('#wallet-address');
+    const hint = $('#wallet-hint');
+    const clearBtn = $('#wallet-clear');
+    const connected = isWalletConnected();
 
     if (!inputPanel || !boundPanel) return;
 
     if (state.progress.claimed) {
-        inputPanel.hidden = false;
-        boundPanel.hidden = !connected;
-        if (input) input.disabled = true;
-    } else if (connected) {
         inputPanel.hidden = true;
         boundPanel.hidden = false;
-        if (input) input.disabled = false;
-    } else {
-        inputPanel.hidden = false;
-        boundPanel.hidden = true;
-        if (input) input.disabled = false;
+        const masked = $('#masked-address');
+        if (masked) masked.textContent = maskAddress(state.progress.walletAddress);
+        return;
     }
 
-    const masked = $('#masked-address');
-    if (masked) masked.textContent = maskAddress(state.progress.walletAddress);
+    inputPanel.hidden = false;
+    boundPanel.hidden = true;
+    if (input) input.disabled = false;
+    if (clearBtn) clearBtn.disabled = false;
+
+    if (hint) {
+        if (connected) {
+            hint.textContent = '✓ Address ready. You can still edit or clear it before claiming.';
+            hint.classList.add('wallet-paste-hint--ok');
+        } else if (state.progress.walletAddress) {
+            hint.textContent = 'Enter a full TON address (UQ... or EQ..., 48+ characters).';
+            hint.classList.remove('wallet-paste-hint--ok');
+        } else {
+            hint.textContent = 'Paste your public receiving address. You can edit or clear it anytime before claiming.';
+            hint.classList.remove('wallet-paste-hint--ok');
+        }
+    }
 }
 
 function updateStash() {
@@ -487,10 +509,10 @@ async function markClaimed() {
     clearTimeout(syncTimer);
 
     const ok = await syncToServer();
-    if (!ok) {
+    if (!ok.ok) {
         state.progress.claimed = false;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
-        showToast('Could not save your claim. Check your wallet address and try again.', true);
+        showToast(ok.message || 'Could not save your claim. Try again.', true);
         return false;
     }
 
@@ -513,10 +535,20 @@ async function handleClaim() {
     }
 
     if (!state.progress.claimed) {
+        const preSync = await syncToServer();
+        if (!preSync.ok) {
+            showToast(preSync.message || 'Could not reach the server. Try again.', true);
+            return;
+        }
+
         const ok = await markClaimed();
         if (!ok) return;
     } else {
-        await syncToServer();
+        const resync = await syncToServer();
+        if (!resync.ok) {
+            showToast(resync.message || 'Could not sync claim status.', true);
+            return;
+        }
     }
 
     openSuccessModal();
@@ -540,40 +572,30 @@ function bindFaq() {
 
 function bindWalletInput() {
     const input = $('#wallet-address');
+    const clearBtn = $('#wallet-clear');
     if (!input) return;
 
     if (state.progress.walletAddress) {
         input.value = state.progress.walletAddress;
     }
 
-    let syncDebounce = null;
-
-    const applyWallet = async (address) => {
-        const trimmed = address.trim();
-        state.progress.walletAddress = trimmed;
-        if (trimmed.length >= 10) {
-            await onWalletLinked(trimmed);
-        } else {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
-            clearTimeout(syncTimer);
-            updateWalletUI();
-            updateStash();
-        }
+    const applyLocal = () => {
+        syncWalletFromInput();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+        updateWalletUI();
+        updateStash();
     };
 
-    input.addEventListener('input', () => {
-        clearTimeout(syncDebounce);
-        syncDebounce = setTimeout(() => { applyWallet(input.value); }, 300);
-    });
+    input.addEventListener('input', applyLocal);
+    input.addEventListener('change', applyLocal);
 
-    input.addEventListener('blur', () => {
-        clearTimeout(syncDebounce);
-        applyWallet(input.value);
-    });
-
-    input.addEventListener('change', () => {
-        clearTimeout(syncDebounce);
-        applyWallet(input.value);
+    clearBtn?.addEventListener('click', () => {
+        if (state.progress.claimed) return;
+        input.value = '';
+        state.progress.walletAddress = '';
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+        updateWalletUI();
+        updateStash();
     });
 }
 
@@ -585,8 +607,8 @@ async function init() {
     initParticles();
     bindFaq();
     bindWalletInput();
-    await pullFromServer(state.progress.walletAddress || undefined);
-    if (state.progress.walletAddress) {
+    await pullFromServer();
+    if (state.progress.walletAddress && !state.progress.claimed) {
         const input = $('#wallet-address');
         if (input) input.value = state.progress.walletAddress;
     }

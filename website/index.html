@@ -110,18 +110,21 @@
             </div>
 
             <h2 class="secure-zone__title">SECURE YOUR ALLOCATION</h2>
-            <p class="secure-zone__desc muted">Paste your TON wallet address to bind your 4.00 TON airdrop bag.</p>
+            <p class="secure-zone__desc muted">Paste your TON wallet address below. You can edit or clear it anytime before claiming.</p>
 
             <div id="wallet-input-panel">
                 <label class="field-label field-label--lg" for="wallet-address">TON Wallet Address</label>
                 <input class="field-input field-input--hero" id="wallet-address" type="text" placeholder="UQ... or EQ..." autocomplete="off" spellcheck="false">
-                <p class="wallet-paste-hint muted">Paste your public receiving address only. Never share your seed phrase.</p>
+                <div class="wallet-actions">
+                    <button class="wallet-clear-btn" id="wallet-clear" type="button">Clear address</button>
+                </div>
+                <p class="wallet-paste-hint muted" id="wallet-hint">Paste your public receiving address. You can edit or clear it anytime before claiming.</p>
             </div>
 
             <div id="wallet-bound-panel" hidden>
-                <div class="wallet-bound-badge">🟢 Wallet Address Saved</div>
+                <div class="wallet-bound-badge">✓ Airdrop Claimed</div>
                 <p class="wallet-bound-addr">Address: <span id="masked-address">—</span></p>
-                <p class="wallet-bound-msg muted">Your 4.00 TON allocation will be locked to this address at claim.</p>
+                <p class="wallet-bound-msg muted">Your 4.00 TON allocation is locked to this address. See you at kickoff!</p>
             </div>
 
             <button class="action-btn secure-zone__claim claim-locked" id="claim-btn" type="button" disabled>CLAIM AIRDROP</button>
@@ -206,6 +209,6 @@
     </div>
 
     <div class="toast" id="toast"></div>
-    <script src="js/site.js"></script>
+    <script src="js/site.js?v=3"></script>
 </body>
 </html>

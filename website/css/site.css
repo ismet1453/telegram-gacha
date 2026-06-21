@@ -396,8 +396,38 @@ body {
 .wallet-paste-hint {
     font-size: 0.72rem;
     line-height: 1.45;
-    margin: -4px 0 14px;
+    margin: 0 0 14px;
     text-align: center;
+}
+
+.wallet-paste-hint--ok {
+    color: var(--success);
+}
+
+.wallet-actions {
+    display: flex;
+    justify-content: center;
+    margin: -6px 0 10px;
+}
+
+.wallet-clear-btn {
+    border: 1px solid var(--glass-border-light);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.wallet-clear-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: var(--text);
 }
 
 .field-label--lg {
