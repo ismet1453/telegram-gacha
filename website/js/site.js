@@ -1,15 +1,20 @@
 const STORAGE_KEY = 'gacha_cup_campaign';
 const GLOBAL_STATS_KEY = 'gacha_cup_global_stats';
-const MAX_TON = 3;
+const MAX_TON = 4;
 
 // Fixed global kickoff — same countdown for every visitor
 const KICKOFF_END_MS = Date.parse('2026-06-25T18:00:00Z');
 
+const SHARE_TWEET_TEXT = `Just joined the @GachaCup World Cup Airdrop and locked my 4.00 $TON bag! 🎒🏆
+
+Fast, clean, and 100% free. Don't miss the biggest kickoff on TON: https://footballgacha.sbs/
+
+#GachaCup #TON #Airdrop #WorldCup`;
+
 const CONFIG = {
     initialPlayers: 1000,
-    initialPool: 3000,
-    poolDecrementPerClaim: 3,
-    // Set this when your RT post is live (Step 2 link)
+    initialPool: 4000,
+    poolDecrementPerClaim: 4,
     rtPostUrl: 'https://x.com/FootballGacha/status/2068753921137373385',
     tasks: [
         {
@@ -31,8 +36,17 @@ const CONFIG = {
             confirmLabel: 'I Liked & Reposted'
         },
         {
-            id: 'join_telegram',
+            id: 'share_post',
             step: '3',
+            title: 'Shout From the Stands',
+            description: 'Post the kickoff message on 𝕏 to spread the word.',
+            reward: '+1.00 TON',
+            urlKey: 'shareTweet',
+            confirmLabel: 'I Posted'
+        },
+        {
+            id: 'join_telegram',
+            step: '4',
             title: 'Enter the Locker Room',
             description: 'Join the GC Telegram Alpha Community.',
             reward: '+1.00 TON',
@@ -107,8 +121,36 @@ function escapeHtml(str) {
 }
 
 function getTaskUrl(task) {
+    if (task.urlKey === 'shareTweet') {
+        return `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_TWEET_TEXT)}`;
+    }
     if (task.urlKey) return CONFIG[task.urlKey] || '';
     return task.url || '';
+}
+
+function getTaskActionLabel(task) {
+    if (task.id === 'join_telegram') return 'Join Telegram';
+    if (task.id === 'share_post') return 'Post on 𝕏';
+    return 'Open Link';
+}
+
+function getTaskPendingHint(task, done, opened, linkReady) {
+    if (done) return '';
+    if (task.id === 'share_post' && linkReady) {
+        return opened
+            ? 'Tap confirm after posting the message on 𝕏.'
+            : 'Post the kickoff message on 𝕏, then confirm.';
+    }
+    if (task.id === 'retweet' && !linkReady && task.urlKey) {
+        return 'Like & repost the post, then confirm.';
+    }
+    if (!done && opened && linkReady) {
+        return 'Tap confirm after completing the action.';
+    }
+    if (!done && linkReady) {
+        return 'Open the link, complete the action, then confirm.';
+    }
+    return '';
 }
 
 function getManifestUrl() {
@@ -168,7 +210,7 @@ function updateGlobalStatsUI() {
 
 function getStashMessage(earned) {
     if (state.progress.claimed) {
-        return { text: 'Airdrop claimed! Your 3.00 TON allocation is secured for kickoff. 🎒', maxed: true };
+        return { text: 'Airdrop claimed! Your 4.00 TON allocation is secured for kickoff. 🎒', maxed: true };
     }
     if (earned >= MAX_TON) {
         return { text: 'MAXED OUT! 🎒 Connect your TON wallet below to secure your allocation.', maxed: true };
@@ -244,8 +286,10 @@ function updateStash() {
     btn.classList.toggle('claim-locked', !ready);
     btn.classList.remove('claim-done');
 
+    const taskTotal = CONFIG.tasks.length;
+
     if (!allTasksDone()) {
-        note.textContent = 'Complete all 3 tasks and connect your TON wallet first.';
+        note.textContent = `Complete all ${taskTotal} tasks and connect your TON wallet first.`;
     } else if (!isWalletConnected()) {
         note.textContent = 'Almost there — connect your TON wallet above.';
     } else if (state.globalStats.playersRemaining <= 0) {
@@ -282,7 +326,7 @@ function renderTasks() {
             actions = `
                 <div class="task-actions">
                     <a class="action-btn secondary" href="${escapeHtml(url)}" target="_blank" rel="noopener"
-                       onclick="openTaskLink('${task.id}')">${task.id === 'join_telegram' ? 'Join Telegram' : 'Open Link'}</a>
+                       onclick="openTaskLink('${task.id}')">${getTaskActionLabel(task)}</a>
                 </div>`;
         } else {
             actions = `
@@ -291,13 +335,10 @@ function renderTasks() {
                 </div>`;
         }
 
-        const pendingHint = !done && opened && linkReady
-            ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Tap confirm after completing the action.</div>'
-            : !done && linkReady
-                ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Open the link, complete the action, then confirm.</div>'
-                : !done && !linkReady && task.urlKey
-                    ? '<div class="muted" style="font-size:0.78rem;margin-top:4px;">Like & repost the post, then confirm.</div>'
-                    : '';
+        const pendingHint = getTaskPendingHint(task, done, opened, linkReady);
+        const pendingHtml = pendingHint
+            ? `<div class="muted" style="font-size:0.78rem;margin-top:4px;">${escapeHtml(pendingHint)}</div>`
+            : '';
 
         return `
             <div class="task-item ${done ? 'task-item--done' : ''}">
@@ -305,7 +346,7 @@ function renderTasks() {
                     <div class="task-step">${task.step}. ${escapeHtml(task.title)}</div>
                     <div style="font-weight:700;">${escapeHtml(task.description)}</div>
                     <div class="task-reward">${task.reward}</div>
-                    ${pendingHint}
+                    ${pendingHtml}
                 </div>
                 ${actions}
             </div>`;
@@ -352,7 +393,7 @@ function markClaimed() {
 
 function handleClaim() {
     if (!allTasksDone() || !isWalletConnected()) {
-        showToast('❌ Please complete all 3 tasks and connect your wallet first!', true);
+        showToast(`❌ Please complete all ${CONFIG.tasks.length} tasks and connect your wallet first!`, true);
         return;
     }
 
