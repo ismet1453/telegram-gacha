@@ -2,8 +2,8 @@ const STORAGE_KEY = 'gacha_cup_campaign';
 const GLOBAL_STATS_KEY = 'gacha_cup_global_stats';
 const MAX_TON = 3;
 
-const KICKOFF_KEY = 'gacha_kickoff_end';
-const KICKOFF_DURATION_MS = (3 * 24 + 18) * 60 * 60 * 1000; // 3d 18h
+// Fixed global kickoff — same countdown for every visitor
+const KICKOFF_END_MS = Date.parse('2026-06-25T18:00:00Z');
 
 const CONFIG = {
     initialPlayers: 1000,
@@ -144,12 +144,7 @@ function initParticles() {
 }
 
 function getKickoffEnd() {
-    let end = Number(localStorage.getItem(KICKOFF_KEY));
-    if (!end || Number.isNaN(end)) {
-        end = Date.now() + KICKOFF_DURATION_MS;
-        localStorage.setItem(KICKOFF_KEY, String(end));
-    }
-    return end;
+    return KICKOFF_END_MS;
 }
 
 function updateCountdown() {
