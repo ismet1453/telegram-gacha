@@ -234,13 +234,13 @@ function updateStash() {
 
     updateWalletUI();
 
-    btn.textContent = 'AİRDROP\'U TALEP ET';
+    btn.textContent = 'CLAIM AIRDROP';
 
     if (state.progress.claimed) {
         btn.disabled = true;
         btn.classList.add('claim-done');
         btn.classList.remove('claim-locked');
-        note.textContent = 'Talebiniz alındı! Ödüller lansman geri sayımında dağıtılacak.';
+        note.textContent = 'Claim confirmed! Rewards will be sent when the launch countdown ends.';
         return;
     }
 
@@ -250,13 +250,13 @@ function updateStash() {
     btn.classList.remove('claim-done');
 
     if (!allTasksDone()) {
-        note.textContent = 'Önce 3 görevi tamamlayın ve TON cüzdanınızı bağlayın.';
+        note.textContent = 'Complete all 3 tasks and connect your TON wallet first.';
     } else if (!isWalletConnected()) {
-        note.textContent = 'Neredeyse hazırsınız — yukarıdan TON cüzdanınızı bağlayın.';
+        note.textContent = 'Almost there — connect your TON wallet above.';
     } else if (state.globalStats.playersRemaining <= 0) {
-        note.textContent = 'Tüm kontenjan doldu. Lansman gününü bekleyin!';
+        note.textContent = 'All spots are filled. See you at launch!';
     } else {
-        note.textContent = 'Hazırsınız! Airdrop\'u talep etmek için butona basın.';
+        note.textContent = 'You\'re ready! Tap the button to claim your airdrop.';
     }
 }
 
@@ -357,12 +357,12 @@ function markClaimed() {
 
 function handleClaim() {
     if (!allTasksDone() || !isWalletConnected()) {
-        showToast('❌ Lütfen önce 3 görevi tamamlayın ve cüzdanınızı bağlayın!', true);
+        showToast('❌ Please complete all 3 tasks and connect your wallet first!', true);
         return;
     }
 
     if (state.globalStats.playersRemaining <= 0 && !state.progress.claimed) {
-        showToast('Tüm kontenjan doldu. Lansman gününü bekleyin!', true);
+        showToast('All spots are filled. See you at launch!', true);
         return;
     }
 
