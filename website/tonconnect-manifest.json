@@ -1,7 +1,7 @@
 {
-    "url": "https://YOUR-DOMAIN.com",
+    "url": "https://telegram-gacha.vercel.app",
     "name": "Gacha Cup",
-    "iconUrl": "https://YOUR-DOMAIN.com/logo.png",
+    "iconUrl": "https://telegram-gacha.vercel.app/logo.png",
     "termsOfUseUrl": "https://t.me/FootballGacha",
     "privacyPolicyUrl": "https://t.me/FootballGacha"
 }
