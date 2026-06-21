@@ -59,8 +59,7 @@ const CONFIG = {
 const state = {
     progress: loadProgress(),
     taskOpened: {},
-    globalStats: loadGlobalStats(),
-    tonConnectUI: null
+    globalStats: loadGlobalStats()
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -242,12 +241,6 @@ function getTaskPendingHint(task, done, opened, linkReady) {
     return '';
 }
 
-function getManifestUrl() {
-    const meta = document.querySelector('meta[name="ton-api-origin"]')?.content?.trim();
-    const origin = (meta || window.location.origin).replace(/\/$/, '');
-    return `${origin}/tonconnect-manifest.json`;
-}
-
 function maskAddress(addr) {
     if (!addr || addr.length < 12) return addr || '—';
     return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
@@ -302,7 +295,7 @@ function getStashMessage(earned) {
         return { text: 'Airdrop claimed! Your 4.00 TON allocation is secured for kickoff. 🎒', maxed: true };
     }
     if (earned >= MAX_TON) {
-        return { text: 'MAXED OUT! 🎒 Connect your TON wallet below to secure your allocation.', maxed: true };
+        return { text: 'MAXED OUT! 🎒 Enter your TON wallet below to secure your allocation.', maxed: true };
     }
     if (earned > 0) {
         return { text: 'Stacking in progress... Don\'t leave free TON on the pitch!', maxed: false };
@@ -316,23 +309,28 @@ function allTasksDone() {
 
 function updateWalletUI() {
     const connected = isWalletConnected();
-    const connectPanel = $('#wallet-connect-panel');
+    const inputPanel = $('#wallet-input-panel');
     const boundPanel = $('#wallet-bound-panel');
-    const desc = $('.secure-zone__desc');
+    const input = $('#wallet-address');
 
-    if (!connectPanel || !boundPanel) return;
+    if (!inputPanel || !boundPanel) return;
 
-    if (connected || state.progress.claimed) {
-        connectPanel.hidden = true;
+    if (state.progress.claimed) {
+        inputPanel.hidden = false;
+        boundPanel.hidden = !connected;
+        if (input) input.disabled = true;
+    } else if (connected) {
+        inputPanel.hidden = true;
         boundPanel.hidden = false;
-        if (desc) desc.hidden = true;
-        const masked = $('#masked-address');
-        if (masked) masked.textContent = maskAddress(state.progress.walletAddress);
+        if (input) input.disabled = false;
     } else {
-        connectPanel.hidden = false;
+        inputPanel.hidden = false;
         boundPanel.hidden = true;
-        if (desc) desc.hidden = false;
+        if (input) input.disabled = false;
     }
+
+    const masked = $('#masked-address');
+    if (masked) masked.textContent = maskAddress(state.progress.walletAddress);
 }
 
 function updateStash() {
@@ -378,9 +376,9 @@ function updateStash() {
     const taskTotal = CONFIG.tasks.length;
 
     if (!allTasksDone()) {
-        note.textContent = `Complete all ${taskTotal} tasks and connect your TON wallet first.`;
+        note.textContent = `Complete all ${taskTotal} tasks and enter your TON wallet first.`;
     } else if (!isWalletConnected()) {
-        note.textContent = 'Almost there — connect your TON wallet above.';
+        note.textContent = 'Almost there — paste your TON wallet address above.';
     } else if (state.globalStats.playersRemaining <= 0) {
         note.textContent = 'All spots are filled. See you at launch!';
     } else {
@@ -478,7 +476,7 @@ function markClaimed() {
 
 function handleClaim() {
     if (!allTasksDone() || !isWalletConnected()) {
-        showToast(`❌ Please complete all ${CONFIG.tasks.length} tasks and connect your wallet first!`, true);
+        showToast(`❌ Please complete all ${CONFIG.tasks.length} tasks and enter your wallet address!`, true);
         return;
     }
 
@@ -510,48 +508,53 @@ function bindFaq() {
     });
 }
 
-async function setupTonConnect() {
-    if (!window.TON_CONNECT_UI) {
-        console.warn('TonConnect UI not loaded');
-        return;
+function bindWalletInput() {
+    const input = $('#wallet-address');
+    if (!input) return;
+
+    if (state.progress.walletAddress) {
+        input.value = state.progress.walletAddress;
     }
 
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: getManifestUrl(),
-        buttonRootId: 'ton-connect'
-    });
+    let syncDebounce = null;
 
-    state.tonConnectUI = tonConnectUI;
-
-    $('#connect-ton-btn')?.addEventListener('click', () => {
-        tonConnectUI.openModal();
-    });
-
-    tonConnectUI.onStatusChange(async (wallet) => {
-        if (wallet?.account?.address) {
-            await onWalletLinked(wallet.account.address);
-            showToast('Wallet connected — progress synced!');
-        } else if (!state.progress.claimed) {
-            state.progress.walletAddress = '';
+    const applyWallet = async (address) => {
+        const trimmed = address.trim();
+        if (trimmed === state.progress.walletAddress) {
+            updateWalletUI();
+            updateStash();
+            return;
+        }
+        state.progress.walletAddress = trimmed;
+        if (trimmed.length >= 10) {
+            await onWalletLinked(trimmed);
+        } else {
             saveProgress();
+            updateWalletUI();
+            updateStash();
         }
-        updateStash();
+    };
+
+    input.addEventListener('input', () => {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => { applyWallet(input.value); }, 500);
     });
 
-    try {
-        const restored = await tonConnectUI.connectionRestored;
-        if (restored && tonConnectUI.wallet?.account?.address) {
-            await onWalletLinked(tonConnectUI.wallet.account.address);
-        }
-    } catch { /* ignore */ }
-
-    updateWalletUI();
+    input.addEventListener('blur', () => {
+        clearTimeout(syncDebounce);
+        applyWallet(input.value);
+    });
 }
 
 async function init() {
     initParticles();
     bindFaq();
-    await pullFromServer();
+    bindWalletInput();
+    await pullFromServer(state.progress.walletAddress || undefined);
+    if (state.progress.walletAddress) {
+        const input = $('#wallet-address');
+        if (input) input.value = state.progress.walletAddress;
+    }
     renderTasks();
     updateStash();
     $('#claim-btn').addEventListener('click', handleClaim);
@@ -561,7 +564,6 @@ async function init() {
     });
     updateCountdown();
     setInterval(updateCountdown, 1000);
-    await setupTonConnect();
 }
 
 init();

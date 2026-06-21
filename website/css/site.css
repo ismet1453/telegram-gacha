@@ -393,6 +393,13 @@ body {
     margin-bottom: 18px;
 }
 
+.wallet-paste-hint {
+    font-size: 0.72rem;
+    line-height: 1.45;
+    margin: -4px 0 14px;
+    text-align: center;
+}
+
 .field-label--lg {
     font-size: 0.68rem;
     text-align: center;

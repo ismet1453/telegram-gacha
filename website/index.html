@@ -8,13 +8,11 @@
     <meta name="description" content="Complete the 4-step hattrick and secure 4.00 TON before kickoff.">
     <!-- API + TonConnect origins. Empty = same origin (footballgacha.sbs). -->
     <meta name="api-origin" content="">
-    <meta name="ton-api-origin" content="">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/site.css">
-    <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
     <div class="app-bg">
@@ -112,47 +110,41 @@
             </div>
 
             <h2 class="secure-zone__title">SECURE YOUR ALLOCATION</h2>
-            <p class="secure-zone__desc muted">Connect your wallet to bind your 4.00 TON airdrop bag to your address.</p>
+            <p class="secure-zone__desc muted">Paste your TON wallet address to bind your 4.00 TON airdrop bag.</p>
 
-            <div id="wallet-connect-panel">
-                <button class="connect-ton-btn" id="connect-ton-btn" type="button">
-                    <span class="connect-ton-btn__gem">💎</span>
-                    CONNECT TON WALLET
-                </button>
-                <p class="trust-badges muted">
-                    🛡️ Official TonConnect SDK &nbsp;·&nbsp; 🔒 Read-Only Access &nbsp;·&nbsp; ⚡ Zero Gas Fees
-                </p>
+            <div id="wallet-input-panel">
+                <label class="field-label field-label--lg" for="wallet-address">TON Wallet Address</label>
+                <input class="field-input field-input--hero" id="wallet-address" type="text" placeholder="UQ... or EQ..." autocomplete="off" spellcheck="false">
+                <p class="wallet-paste-hint muted">Paste your public receiving address only. Never share your seed phrase.</p>
             </div>
 
             <div id="wallet-bound-panel" hidden>
-                <div class="wallet-bound-badge">🟢 Wallet Successfully Bound</div>
+                <div class="wallet-bound-badge">🟢 Wallet Address Saved</div>
                 <p class="wallet-bound-addr">Address: <span id="masked-address">—</span></p>
-                <p class="wallet-bound-msg muted">Your 4.00 TON allocation is securely locked to this address. See you at kickoff!</p>
+                <p class="wallet-bound-msg muted">Your 4.00 TON allocation will be locked to this address at claim.</p>
             </div>
 
             <button class="action-btn secure-zone__claim claim-locked" id="claim-btn" type="button" disabled>CLAIM AIRDROP</button>
-            <p class="claim-note muted" id="claim-note">Complete all 4 tasks and connect your TON wallet to claim.</p>
+            <p class="claim-note muted" id="claim-note">Complete all 4 tasks and enter your TON wallet to claim.</p>
         </section>
 
         <section class="faq glass" id="faq">
             <button class="faq__item" type="button" aria-expanded="false">
-                <span class="faq__q">Is connecting my wallet safe?</span>
+                <span class="faq__q">Is it safe to paste my wallet address?</span>
                 <span class="faq__chev">▼</span>
             </button>
             <div class="faq__a" hidden>
-                <p>Yes. We use official TonConnect protocol. The app only requests 'View' access to verify your address. It cannot touch or move your funds.</p>
+                <p>Yes. We only collect your public TON address to reserve your airdrop spot. We never ask for your seed phrase or private keys, and we cannot move your funds.</p>
             </div>
 
             <button class="faq__item" type="button" aria-expanded="false">
-                <span class="faq__q">Why do I need to connect now?</span>
+                <span class="faq__q">Why do I need to enter my address now?</span>
                 <span class="faq__chev">▼</span>
             </button>
             <div class="faq__a" hidden>
                 <p>To prevent bot abuse. Every airdrop bag must be tied to a verified TON address before the snapshot.</p>
             </div>
         </section>
-
-        <div id="ton-connect" class="ton-connect-hidden" aria-hidden="true"></div>
 
         <div class="ticker-bar">
             <div class="ticker-track">
