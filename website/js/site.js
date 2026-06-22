@@ -6,7 +6,7 @@ const TASK_REWARD = 0.25;
 // Fixed global kickoff — same countdown for every visitor
 const KICKOFF_END_MS = Date.parse('2026-06-25T18:00:00Z');
 
-const SHARE_TWEET_TEXT = `Just joined the @IOynuyor14803 World Cup Airdrop and locked my 1.00 $TON bag! 🎒🏆
+const SHARE_TWEET_TEXT = `Just joined the @GachaCup World Cup Airdrop and locked my 1.00 $TON bag! 🎒🏆
 
 Fast, clean, and 100% free. Don't miss the biggest kickoff on TON: https://footballgacha.sbs/
 
@@ -42,10 +42,10 @@ const CONFIG = {
             id: 'share_post',
             step: '3',
             title: 'Shout From the Stands',
-            description: 'Open the airdrop post on 𝕏 and engage to spread the word.',
+            description: 'Post the kickoff message on 𝕏 to spread the word.',
             reward: '+0.25 TON',
-            urlKey: 'rtPostUrl',
-            confirmLabel: 'I Engaged'
+            urlKey: 'shareTweet',
+            confirmLabel: 'I Posted'
         },
         {
             id: 'join_telegram',
@@ -239,7 +239,7 @@ function getTaskUrl(task) {
 
 function getTaskActionLabel(task) {
     if (task.id === 'join_telegram') return 'Join Telegram';
-    if (task.id === 'share_post') return 'Open on 𝕏';
+    if (task.id === 'share_post') return 'Post on 𝕏';
     return 'Open Link';
 }
 
@@ -247,8 +247,8 @@ function getTaskPendingHint(task, done, opened, linkReady) {
     if (done) return '';
     if (task.id === 'share_post' && linkReady) {
         return opened
-            ? 'Tap confirm after engaging with the post on 𝕏.'
-            : 'Open the airdrop post on 𝕏, then confirm.';
+            ? 'Tap confirm after posting the message on 𝕏.'
+            : 'Post the kickoff message on 𝕏, then confirm.';
     }
     if (task.id === 'retweet' && !linkReady && task.urlKey) {
         return 'Like & repost the post, then confirm.';
