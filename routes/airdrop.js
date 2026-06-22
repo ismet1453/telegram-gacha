@@ -3,14 +3,26 @@ const AirdropWallet = require('../models/AirdropWallet');
 
 const router = express.Router();
 
-const MAX_TON = 4;
-const INITIAL_PLAYERS = 1000;
-const INITIAL_POOL = 4000;
-const POOL_PER_CLAIM = 4;
+const MAX_TON = 1;
+const TASK_REWARD = 0.25;
+const INITIAL_PLAYERS = 500;
+const INITIAL_POOL = 500;
+const POOL_PER_CLAIM = 1;
 const VALID_TASKS = new Set(['follow_x', 'retweet', 'share_post', 'join_telegram']);
 
 function normalizeWallet(w) {
-    return String(w || '').trim();
+    let s = String(w || '').trim().replace(/\s+/g, '');
+    const friendly = s.match(/(?:EQ|UQ|kQ)[A-Za-z0-9_-]{46}/);
+    if (friendly) return friendly[0];
+    const raw = s.match(/0:[a-fA-F0-9]{64}/);
+    if (raw) return raw[0];
+    return s;
+}
+
+function isValidWallet(wallet) {
+    const w = normalizeWallet(wallet);
+    if (w.startsWith('0:')) return w.length >= 66;
+    return w.length >= 48 && /^(EQ|UQ|kQ)/.test(w);
 }
 
 function serialize(doc) {
@@ -35,7 +47,7 @@ router.get('/progress', async (req, res) => {
         const wallet = normalizeWallet(req.query.wallet);
         const stats = await getStats();
 
-        if (wallet.length < 10) {
+        if (!isValidWallet(wallet)) {
             return res.json({ success: true, progress: null, stats });
         }
 
@@ -53,14 +65,17 @@ router.get('/progress', async (req, res) => {
 router.post('/progress', async (req, res) => {
     try {
         const wallet = normalizeWallet(req.body.walletAddress);
-        if (wallet.length < 10) {
-            return res.status(400).json({ success: false, message: 'Invalid wallet address' });
+        if (!isValidWallet(wallet)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid TON wallet address. Paste your full UQ... or EQ... address (48 characters).'
+            });
         }
 
         const tasks = Array.isArray(req.body.completedTasks)
             ? [...new Set(req.body.completedTasks.filter((t) => VALID_TASKS.has(t)))]
             : [];
-        const earnedTon = Math.min(MAX_TON, Math.max(0, Number(req.body.earnedTon) || tasks.length));
+        const earnedTon = Math.min(MAX_TON, Math.max(0, Number(req.body.earnedTon) || tasks.length * TASK_REWARD));
         const claimed = !!req.body.claimed;
 
         let doc = await AirdropWallet.findOne({ walletAddress: wallet });
@@ -74,7 +89,7 @@ router.post('/progress', async (req, res) => {
         } else {
             const mergedTasks = [...new Set([...(doc.completedTasks || []), ...tasks])];
             doc.completedTasks = mergedTasks;
-            doc.earnedTon = Math.min(MAX_TON, Math.max(doc.earnedTon, earnedTon, mergedTasks.length));
+            doc.earnedTon = Math.min(MAX_TON, Math.max(doc.earnedTon, earnedTon, mergedTasks.length * TASK_REWARD));
             if (claimed) doc.claimed = true;
             await doc.save();
         }

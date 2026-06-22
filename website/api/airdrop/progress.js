@@ -1,13 +1,24 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
-const MAX_TON = 4;
-const INITIAL_PLAYERS = 1000;
-const INITIAL_POOL = 4000;
-const POOL_PER_CLAIM = 4;
+const MAX_TON = 1;
+const TASK_REWARD = 0.25;
+const INITIAL_PLAYERS = 500;
+const INITIAL_POOL = 500;
+const POOL_PER_CLAIM = 1;
 const VALID_TASKS = new Set(['follow_x', 'retweet', 'share_post', 'join_telegram']);
 const COLLECTION = 'airdropwallets';
+const DEFAULT_DB = 'gachaCup';
 
-let clientPromise;
+function getUri() {
+    return process.env.MONGO_URI || process.env.MONGODB_URI || '';
+}
+
+function getDbName() {
+    const uri = getUri();
+    const match = uri.match(/mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)/);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+    return process.env.MONGO_DB_NAME || DEFAULT_DB;
+}
 
 function isRetryableMongoError(err) {
     const msg = String(err?.message || err || '').toLowerCase();
@@ -19,61 +30,43 @@ function isRetryableMongoError(err) {
         || msg.includes('topology') && msg.includes('destroyed');
 }
 
-async function resetClient() {
-    if (!clientPromise) return;
-    try {
-        const client = await clientPromise;
-        await client.close();
-    } catch { /* ignore */ }
-    clientPromise = null;
+function clientOptions() {
+    return {
+        serverApi: {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true
+        },
+        maxPoolSize: 1,
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 15000,
+        readPreference: 'primary',
+        retryWrites: true,
+        retryReads: true
+    };
 }
 
-async function withMongoRetry(fn, attempts = 6) {
+async function withCollection(fn, attempts = 5) {
+    const uri = getUri();
+    if (!uri) throw new Error('MONGO_URI not configured');
+
     let lastError;
-    for (let i = 0; i < attempts; i++) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const client = new MongoClient(uri, clientOptions());
         try {
-            return await fn();
+            await client.connect();
+            const col = client.db(getDbName()).collection(COLLECTION);
+            return await fn(col);
         } catch (err) {
             lastError = err;
-            if (!isRetryableMongoError(err) || i === attempts - 1) throw err;
-            await resetClient();
-            const backoff = Math.min(2000, 250 * Math.pow(1.5, i)) + Math.random() * 150;
-            await new Promise((r) => setTimeout(r, backoff));
+            if (!isRetryableMongoError(err) || attempt === attempts - 1) throw err;
+            await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+        } finally {
+            await client.close().catch(() => {});
         }
     }
     throw lastError;
-}
-
-function getUri() {
-    return process.env.MONGO_URI || process.env.MONGODB_URI || '';
-}
-
-function getClient() {
-    const uri = getUri();
-    if (!uri) return null;
-
-    if (!clientPromise) {
-        const client = new MongoClient(uri, {
-            maxPoolSize: 10,
-            minPoolSize: 0,
-            serverSelectionTimeoutMS: 15000,
-            socketTimeoutMS: 45000,
-            connectTimeoutMS: 15000,
-            readPreference: 'primary',
-            retryWrites: true,
-            retryReads: true
-        });
-        clientPromise = client.connect();
-    }
-    return clientPromise;
-}
-
-async function getCollection() {
-    return withMongoRetry(async () => {
-        const client = await getClient();
-        if (!client) throw new Error('MONGO_URI not configured');
-        return client.db().collection(COLLECTION);
-    });
 }
 
 function cors(res) {
@@ -138,12 +131,31 @@ async function readRequestBody(req) {
         req.on('end', () => {
             try {
                 resolve(raw.trim() ? JSON.parse(raw) : {});
-            } catch (error) {
+            } catch {
                 reject(new Error('Invalid JSON body'));
             }
         });
         req.on('error', reject);
     });
+}
+
+function formatError(error) {
+    const raw = String(error.message || 'Server error');
+    const lower = raw.toLowerCase();
+
+    if (raw === 'MONGO_URI not configured') {
+        return 'MONGO_URI not set on Vercel. Add your MongoDB Atlas connection string, then redeploy.';
+    }
+    if (lower.includes('authentication') || lower.includes('auth failed') || lower.includes('bad auth')) {
+        return 'MongoDB login failed. Check username/password in MONGO_URI on Vercel (encode special characters in the password).';
+    }
+    if (isRetryableMongoError(error)) {
+        return 'Database is reconnecting. Wait a moment and tap Claim again.';
+    }
+    if (lower.includes('network') || lower.includes('connect') || lower.includes('timed out')) {
+        return 'Database connection failed. In MongoDB Atlas → Network Access, allow 0.0.0.0/0, then redeploy Vercel.';
+    }
+    return raw;
 }
 
 module.exports = async (req, res) => {
@@ -153,27 +165,26 @@ module.exports = async (req, res) => {
     if (!getUri()) {
         return res.status(503).json({
             success: false,
-            message: 'MONGO_URI not set on Vercel. Add it in Project Settings → Environment Variables, then redeploy.'
+            message: 'MONGO_URI not set on Vercel. Add your MongoDB Atlas connection string, then redeploy.'
         });
     }
 
     try {
-        const col = await getCollection();
-
         if (req.method === 'GET') {
             const wallet = normalizeWallet(req.query.wallet);
-            const stats = await getStats(col);
-
-            if (!isValidWallet(wallet)) {
-                return res.status(200).json({ success: true, progress: null, stats });
-            }
-
-            const doc = await col.findOne({ walletAddress: wallet });
-            return res.status(200).json({
-                success: true,
-                progress: doc ? serialize(doc) : null,
-                stats
+            const result = await withCollection(async (col) => {
+                const stats = await getStats(col);
+                if (!isValidWallet(wallet)) {
+                    return { success: true, progress: null, stats };
+                }
+                const doc = await col.findOne({ walletAddress: wallet });
+                return {
+                    success: true,
+                    progress: doc ? serialize(doc) : null,
+                    stats
+                };
             });
+            return res.status(200).json(result);
         }
 
         if (req.method === 'POST') {
@@ -195,49 +206,44 @@ module.exports = async (req, res) => {
             const tasks = Array.isArray(body.completedTasks)
                 ? [...new Set(body.completedTasks.filter((t) => VALID_TASKS.has(t)))]
                 : [];
-            const earnedTon = Math.min(MAX_TON, Math.max(0, Number(body.earnedTon) || tasks.length));
+            const earnedTon = Math.min(MAX_TON, Math.max(0, Number(body.earnedTon) || tasks.length * TASK_REWARD));
             const claimed = !!body.claimed;
 
-            const existing = await withMongoRetry(() => col.findOne({ walletAddress: wallet }));
-            let doc;
+            const result = await withCollection(async (col) => {
+                const existing = await col.findOne({ walletAddress: wallet });
+                let doc;
 
-            if (!existing) {
-                doc = {
-                    walletAddress: wallet,
-                    completedTasks: tasks,
-                    earnedTon,
-                    claimed,
-                    updatedAt: new Date()
-                };
-                await withMongoRetry(() => col.insertOne(doc));
-            } else {
-                const mergedTasks = [...new Set([...(existing.completedTasks || []), ...tasks])];
-                doc = {
-                    walletAddress: wallet,
-                    completedTasks: mergedTasks,
-                    earnedTon: Math.min(MAX_TON, Math.max(existing.earnedTon || 0, earnedTon, mergedTasks.length)),
-                    claimed: existing.claimed || claimed,
-                    updatedAt: new Date()
-                };
-                await withMongoRetry(() => col.updateOne({ walletAddress: wallet }, { $set: doc }));
-            }
+                if (!existing) {
+                    doc = {
+                        walletAddress: wallet,
+                        completedTasks: tasks,
+                        earnedTon,
+                        claimed,
+                        updatedAt: new Date()
+                    };
+                    await col.insertOne(doc);
+                } else {
+                    const mergedTasks = [...new Set([...(existing.completedTasks || []), ...tasks])];
+                    doc = {
+                        walletAddress: wallet,
+                        completedTasks: mergedTasks,
+                        earnedTon: Math.min(MAX_TON, Math.max(existing.earnedTon || 0, earnedTon, mergedTasks.length * TASK_REWARD)),
+                        claimed: existing.claimed || claimed,
+                        updatedAt: new Date()
+                    };
+                    await col.updateOne({ walletAddress: wallet }, { $set: doc });
+                }
 
-            const stats = await withMongoRetry(() => getStats(col));
-            return res.status(200).json({ success: true, progress: serialize(doc), stats });
+                const stats = await getStats(col);
+                return { success: true, progress: serialize(doc), stats };
+            });
+
+            return res.status(200).json(result);
         }
 
         return res.status(405).json({ success: false, message: 'Method not allowed' });
     } catch (error) {
         console.error('Airdrop API error:', error.message);
-        const raw = String(error.message || 'Server error');
-        let message = raw;
-        if (raw === 'MONGO_URI not configured') {
-            message = 'MONGO_URI not set on Vercel. Add it in Project Settings → Environment Variables, then redeploy.';
-        } else if (isRetryableMongoError(error)) {
-            message = 'Database is reconnecting. Wait a moment and tap Claim again.';
-        } else if (raw.includes('MONGO') || raw.toLowerCase().includes('connect')) {
-            message = 'Database connection failed. Check MONGO_URI on Vercel and MongoDB Atlas Network Access (allow 0.0.0.0/0).';
-        }
-        return res.status(503).json({ success: false, message });
+        return res.status(503).json({ success: false, message: formatError(error) });
     }
 };

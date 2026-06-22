@@ -1,46 +1,46 @@
-# Vercel — canlı havuz için zorunlu ayar
+# Vercel — bağımsız kampanya sitesi (footballgacha.sbs)
 
-Site `footballgacha.sbs` üzerinde çalışıyor ama **havuz / oyuncu sayısı** ve **cüzdan ilerlemesi** için MongoDB gerekir.
+Site tamamen **Vercel + MongoDB Atlas** ile çalışır. Railway veya başka backend gerekmez.
 
-## 1) MONGO_URI ekle (2 dk)
+## 1) MongoDB Atlas hesabı (ücretsiz)
 
-1. Bilgisayarında `TelegramGacha/.env` dosyasını aç  
-2. `MONGO_URI=mongodb+srv://...` satırının **tamamını** kopyala  
-3. [vercel.com](https://vercel.com) → **telegram-gacha** projesi  
-4. **Settings → Environment Variables**  
-5. **Add:**
-   - Name: `MONGO_URI`
-   - Value: yapıştır (mongodb bağlantı dizesi)
-   - Environment: **Production** ✓ (Preview + Development da işaretle)
-6. **Save**  
-7. **Deployments** → son deploy → **⋯ → Redeploy**
+GitHub ile giriş çalışmıyorsa **e-posta ile yeni hesap** aç:
 
-## 2) MongoDB Atlas — ağ erişimi
+1. https://www.mongodb.com/cloud/atlas/register  
+2. **Sign up with Email** (GitHub kullanma)  
+3. **Create** → **M0 FREE** cluster (herhangi bir bölge)  
+4. **Database Access** → Add user → kullanıcı adı + güçlü şifre (kaydet)  
+5. **Network Access** → **Add IP Address** → **Allow Access from Anywhere** (`0.0.0.0/0`)  
+6. **Database** → **Connect** → **Drivers** → connection string kopyala  
+   - Örnek: `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/gachaCup?retryWrites=true&w=majority`  
+   - Şifrede `@`, `#`, `:` varsa [URL encode](https://www.urlencoder.org/) et
 
-1. [cloud.mongodb.com](https://cloud.mongodb.com) → cluster  
-2. **Network Access** → **Add IP Address**  
-3. **Allow Access from Anywhere** (`0.0.0.0/0`)  
-   - Vercel sunucuları sabit IP kullanmaz; bu şart.
+## 2) Vercel’e MONGO_URI ekle
+
+1. [vercel.com](https://vercel.com) → **telegram-gacha** projesi  
+2. **Settings → Environment Variables**  
+3. Name: `MONGO_URI` → Value: Atlas connection string  
+4. Environment: **Production** (+ Preview önerilir)  
+5. **Save** → **Deployments → Redeploy**
 
 ## 3) Test
-
-Tarayıcıda aç:
 
 ```
 https://footballgacha.sbs/api/airdrop/progress
 ```
 
-**Çalışıyorsa:**
+Beklenen:
 ```json
-{"success":true,"progress":null,"stats":{"playersRemaining":1000,"tonPoolRemaining":4000}}
+{"success":true,"progress":null,"stats":{"playersRemaining":500,"tonPoolRemaining":500}}
 ```
 
-**Hâlâ hata varsa:** mesajdaki metne bak — `MONGO_URI not set` veya `connection failed`.
+Claim sonrası `playersRemaining` 499, `tonPoolRemaining` 499 olmalı (kişi başı 1 TON).
 
-## Nasıl azalır?
+## Sık hatalar
 
-Biri **CLAIM AIRDROP** yaptığında:
-- `playersRemaining` → 1 azalır  
-- `tonPoolRemaining` → 4 azalır  
-
-Tüm ziyaretçiler aynı sayıları görür.
+| Mesaj | Çözüm |
+|--------|--------|
+| `MONGO_URI not set` | Vercel env ekle + redeploy |
+| `MongoDB login failed` | Kullanıcı/şifre veya URL-encoded şifre |
+| `Database connection failed` | Atlas → Network Access → `0.0.0.0/0` |
+| `not primary` / reconnecting | Birkaç saniye bekle, tekrar dene (kod otomatik retry yapar) |

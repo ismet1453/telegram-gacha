@@ -1,20 +1,23 @@
 const STORAGE_KEY = 'gacha_cup_campaign';
 const GLOBAL_STATS_KEY = 'gacha_cup_global_stats';
-const MAX_TON = 4;
+const MAX_TON = 1;
+const TASK_REWARD = 0.25;
 
 // Fixed global kickoff — same countdown for every visitor
 const KICKOFF_END_MS = Date.parse('2026-06-25T18:00:00Z');
 
-const SHARE_TWEET_TEXT = `Just joined the @GachaCup World Cup Airdrop and locked my 4.00 $TON bag! 🎒🏆
+const SHARE_TWEET_TEXT = `Just joined the @GachaCup World Cup Airdrop and locked my 1.00 $TON bag! 🎒🏆
 
 Fast, clean, and 100% free. Don't miss the biggest kickoff on TON: https://footballgacha.sbs/
 
 #GachaCup #TON #Airdrop #WorldCup`;
 
 const CONFIG = {
-    initialPlayers: 1000,
-    initialPool: 4000,
-    poolDecrementPerClaim: 4,
+    initialPlayers: 500,
+    initialPool: 500,
+    poolDecrementPerClaim: 1,
+    taskReward: TASK_REWARD,
+    maxTon: MAX_TON,
     rtPostUrl: 'https://x.com/FootballGacha/status/2068753921137373385',
     tasks: [
         {
@@ -22,7 +25,7 @@ const CONFIG = {
             step: '1',
             title: 'Scout the Pitch on 𝕏',
             description: 'Follow @FootballGacha for drop intel.',
-            reward: '+1.00 TON',
+            reward: '+0.25 TON',
             url: 'https://x.com/FootballGacha',
             confirmLabel: 'I Followed'
         },
@@ -31,7 +34,7 @@ const CONFIG = {
             step: '2',
             title: 'Pass the Ball',
             description: 'Like and repost our Kick-Off Airdrop post on 𝕏.',
-            reward: '+1.00 TON',
+            reward: '+0.25 TON',
             urlKey: 'rtPostUrl',
             confirmLabel: 'I Liked & Reposted'
         },
@@ -40,7 +43,7 @@ const CONFIG = {
             step: '3',
             title: 'Shout From the Stands',
             description: 'Post the kickoff message on 𝕏 to spread the word.',
-            reward: '+1.00 TON',
+            reward: '+0.25 TON',
             urlKey: 'shareTweet',
             confirmLabel: 'I Posted'
         },
@@ -49,7 +52,7 @@ const CONFIG = {
             step: '4',
             title: 'Enter the Locker Room',
             description: 'Join the GC Telegram Alpha Community.',
-            reward: '+1.00 TON',
+            reward: '+0.25 TON',
             url: 'https://t.me/FootballGacha',
             confirmLabel: 'I Joined'
         }
@@ -88,10 +91,14 @@ function getApiBase() {
     return (meta || window.location.origin).replace(/\/$/, '');
 }
 
+function earnedFromTaskCount(count) {
+    return Math.min(MAX_TON, count * TASK_REWARD);
+}
+
 function mergeProgress(local, remote) {
     if (!remote) return { ...local };
     const tasks = [...new Set([...(local.completedTasks || []), ...(remote.completedTasks || [])])];
-    const earnedTon = Math.min(MAX_TON, Math.max(local.earnedTon || 0, remote.earnedTon || 0, tasks.length));
+    const earnedTon = Math.min(MAX_TON, Math.max(local.earnedTon || 0, remote.earnedTon || 0, earnedFromTaskCount(tasks.length)));
     return {
         completedTasks: tasks,
         earnedTon,
@@ -333,7 +340,7 @@ function updateGlobalStatsUI() {
 
 function getStashMessage(earned) {
     if (state.progress.claimed) {
-        return { text: 'Airdrop claimed! Your 4.00 TON allocation is secured for kickoff. 🎒', maxed: true };
+        return { text: 'Airdrop claimed! Your 1.00 TON allocation is secured for kickoff. 🎒', maxed: true };
     }
     if (earned >= MAX_TON) {
         return { text: 'MAXED OUT! 🎒 Enter your TON wallet below to secure your allocation.', maxed: true };
@@ -386,7 +393,7 @@ function updateWalletUI() {
 }
 
 function updateStash() {
-    const earned = state.progress.earnedTon || 0;
+    const earned = Math.min(MAX_TON, state.progress.earnedTon || 0);
     const taskCount = state.progress.completedTasks.length;
     const pct = Math.round((taskCount / CONFIG.tasks.length) * 100);
 
@@ -442,7 +449,7 @@ function completeTask(taskId) {
     if (state.progress.completedTasks.includes(taskId)) return;
     if (!CONFIG.tasks.find((t) => t.id === taskId)) return;
     state.progress.completedTasks.push(taskId);
-    state.progress.earnedTon = Math.min(MAX_TON, (state.progress.earnedTon || 0) + 1);
+    state.progress.earnedTon = Math.min(MAX_TON, (state.progress.earnedTon || 0) + TASK_REWARD);
     saveProgress();
 }
 
@@ -502,7 +509,7 @@ window.confirmTask = (taskId) => {
     completeTask(taskId);
     renderTasks();
     updateStash();
-    showToast('+1.00 TON added to your stash!');
+    showToast(`+${formatTon(TASK_REWARD)} TON added to your stash!`);
 };
 
 function openSuccessModal() {
